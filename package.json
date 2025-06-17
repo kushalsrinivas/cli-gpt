@@ -1,0 +1,29 @@
+{
+  "name": "cliagent",
+  "version": "1.0.0",
+  "description": "A CLI agentic tool that can execute commands and manage files using AI",
+  "main": "src/index.js",
+  "type": "module",
+  "bin": {
+    "cliagent": "./src/cli.js"
+  },
+  "scripts": {
+    "start": "node src/index.js",
+    "cli": "node src/cli.js",
+    "dev": "node --watch src/cli.js"
+  },
+  "keywords": ["cli", "agent", "ai", "automation"],
+  "author": "",
+  "license": "MIT",
+  "dependencies": {
+    "commander": "^11.1.0",
+    "chalk": "^5.3.0",
+    "inquirer": "^9.2.12",
+    "axios": "^1.6.2",
+    "fs-extra": "^11.2.0",
+    "dotenv": "^16.3.1"
+  },
+  "engines": {
+    "node": ">=18.0.0"
+  }
+} 
