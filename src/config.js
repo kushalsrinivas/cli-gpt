@@ -24,6 +24,10 @@ class Config {
       maxTokens: 2000,
       temperature: 0.7,
       verbose: false,
+      contextWindowSize: 4000,
+      ragTopK: 3,
+      ragRetrievalStrategy: "keyword",
+      sessionsDir: path.join(os.homedir(), ".cliagent", "sessions"),
     };
 
     let fileConfig = {};
@@ -61,6 +65,22 @@ class Config {
         process.env.VERBOSE === "true" ||
         fileConfig.verbose ||
         defaults.verbose,
+      contextWindowSize:
+        parseInt(process.env.CONTEXT_WINDOW_SIZE) ||
+        fileConfig.contextWindowSize ||
+        defaults.contextWindowSize,
+      ragTopK:
+        parseInt(process.env.RAG_TOP_K) ||
+        fileConfig.ragTopK ||
+        defaults.ragTopK,
+      ragRetrievalStrategy:
+        process.env.RAG_STRATEGY ||
+        fileConfig.ragRetrievalStrategy ||
+        defaults.ragRetrievalStrategy,
+      sessionsDir:
+        process.env.SESSIONS_DIR ||
+        fileConfig.sessionsDir ||
+        defaults.sessionsDir,
     };
 
     return envConfig;
@@ -140,6 +160,27 @@ class Config {
         message: "Enable verbose output by default?",
         default: this.config.verbose,
       },
+      {
+        type: "number",
+        name: "contextWindowSize",
+        message: "Context window size (number of lines to keep per session):",
+        default: this.config.contextWindowSize,
+        validate: (input) => input > 0 || "Must be a positive integer",
+      },
+      {
+        type: "number",
+        name: "ragTopK",
+        message: "Top-K snippets to retrieve for RAG:",
+        default: this.config.ragTopK,
+        validate: (input) => input > 0 || "Must be a positive integer",
+      },
+      {
+        type: "list",
+        name: "ragRetrievalStrategy",
+        message: "Retrieval strategy for RAG:",
+        choices: ["keyword", "embedding"],
+        default: this.config.ragRetrievalStrategy,
+      },
     ];
 
     const answers = await inquirer.prompt(questions);
@@ -186,6 +227,10 @@ DEFAULT_MODEL=${this.config.defaultModel}
 MAX_TOKENS=${this.config.maxTokens}
 TEMPERATURE=${this.config.temperature}
 VERBOSE=${this.config.verbose}
+CONTEXT_WINDOW_SIZE=${this.config.contextWindowSize}
+RAG_TOP_K=${this.config.ragTopK}
+RAG_STRATEGY=${this.config.ragRetrievalStrategy}
+SESSIONS_DIR=${this.config.sessionsDir}
 `;
 
     try {
@@ -214,6 +259,23 @@ VERBOSE=${this.config.verbose}
 
   get verbose() {
     return this.config.verbose;
+  }
+
+  // New getters for session & RAG config
+  get contextWindowSize() {
+    return this.config.contextWindowSize;
+  }
+
+  get ragTopK() {
+    return this.config.ragTopK;
+  }
+
+  get ragRetrievalStrategy() {
+    return this.config.ragRetrievalStrategy;
+  }
+
+  get sessionsDir() {
+    return this.config.sessionsDir;
   }
 
   // Check if this is the first time running and initialize if needed
@@ -331,6 +393,27 @@ VERBOSE=${this.config.verbose}
         message: "Enable verbose output by default?",
         default: false,
       },
+      {
+        type: "number",
+        name: "contextWindowSize",
+        message: "Context window size (number of lines to keep per session):",
+        default: 4000,
+        validate: (input) => input > 0 || "Must be positive",
+      },
+      {
+        type: "number",
+        name: "ragTopK",
+        message: "Top-K snippets to retrieve for RAG:",
+        default: 3,
+        validate: (input) => input > 0 || "Must be positive",
+      },
+      {
+        type: "list",
+        name: "ragRetrievalStrategy",
+        message: "Retrieval strategy for RAG:",
+        choices: ["keyword", "embedding"],
+        default: "keyword",
+      },
     ];
 
     const answers = await inquirer.prompt(questions);
@@ -426,6 +509,10 @@ DEFAULT_MODEL=${model}
 MAX_TOKENS=${this.config.maxTokens}
 TEMPERATURE=${this.config.temperature}
 VERBOSE=${this.config.verbose}
+CONTEXT_WINDOW_SIZE=${this.config.contextWindowSize}
+RAG_TOP_K=${this.config.ragTopK}
+RAG_STRATEGY=${this.config.ragRetrievalStrategy}
+SESSIONS_DIR=${this.config.sessionsDir}
 `;
       }
 

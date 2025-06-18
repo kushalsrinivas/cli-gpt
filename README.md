@@ -344,6 +344,38 @@ node src/cli.js run "problematic task" --verbose --json
 - [ ] Integration with more AI providers
 - [ ] Web interface for agent management
 
----
+## Session Management & Retrieval-Augmented Generation (RAG)
 
-_The CLI Agent provides a powerful, interactive way to leverage AI for command-line tasks and file management. Start with the interactive mode for the best experience!_
+The agent now supports **persistent sessions** that maintain a rolling context window on disk and inject the most relevant snippets back into the prompt for better reasoning.
+
+### Commands
+
+```bash
+# Create a new session
+cliagent new-session
+
+# Run a task inside that session
+cliagent run "How do I add RAG?" --session <id>
+
+# Show what the model remembers so far
+cliagent show-context <id>
+
+# Clear the context window
+cliagent clear-context <id>
+```
+
+### Configuration
+
+| Key                 | Description                                 | Default              |
+| ------------------- | ------------------------------------------- | -------------------- |
+| CONTEXT_WINDOW_SIZE | Max JSONL lines per session                 | 4000                 |
+| RAG_TOP_K           | Number of snippets injected                 | 3                    |
+| RAG_STRATEGY        | Retrieval strategy (`keyword`, `embedding`) | keyword              |
+| SESSIONS_DIR        | Directory for sessions                      | ~/.cliagent/sessions |
+
+Update these values via `cliagent config` or by editing your `.env` file.
+
+### Flow Diagram
+
+1. Each mode output is appended to `context_window.jsonl`.
+2. Before THINK, top-K snippets are fetched via `fast-fuzzy` keyword search.

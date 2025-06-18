@@ -6,13 +6,21 @@ import chalk from "chalk";
 import inquirer from "inquirer";
 import readline from "readline";
 import { OpenRouterClient } from "./openrouter.js";
+import { SessionManager } from "./sessionManager.js";
+import { Retriever } from "./retriever.js";
 
 const execAsync = promisify(exec);
 
 export class Agent {
-  constructor(config) {
+  constructor(config, sessionId = null) {
     this.config = config;
     this.openRouter = new OpenRouterClient(config.openRouterApiKey);
+
+    // Session & RAG setup
+    this.sessionManager = new SessionManager(config);
+    this.sessionId = sessionId || this.sessionManager.generateSessionId();
+    this.retriever = new Retriever(config, this.sessionManager);
+
     this.tools = {
       executeCommand: this.executeCommand.bind(this),
       createFile: this.createFile.bind(this),
@@ -163,7 +171,13 @@ export class Agent {
   }
 
   async thinkPhase(context, options) {
-    const thinkingPrompt = this.buildThinkingPrompt(context);
+    // Retrieve relevant context snippets for RAG
+    const ragSnippets = await this.retriever.retrieve(
+      this.sessionId,
+      context.originalTask
+    );
+
+    const thinkingPrompt = this.buildThinkingPrompt(context, ragSnippets);
 
     try {
       const aiResponse = await this.openRouter.chat([
@@ -263,7 +277,7 @@ export class Agent {
     };
   }
 
-  buildThinkingPrompt(context) {
+  buildThinkingPrompt(context, ragSnippets = []) {
     return `
 TASK: ${context.originalTask}
 
@@ -271,6 +285,9 @@ CONTEXT:
 - Current iteration: ${this.currentIteration}
 - Previous observations: ${JSON.stringify(context.observations, null, 2)}
 - History: ${JSON.stringify(context.history, null, 2)}
+
+RAG_SNIPPETS:
+${JSON.stringify(ragSnippets, null, 2)}
 
 Please think through this task step by step. You must provide your response in the following JSON format:
 
@@ -418,11 +435,26 @@ Available tools: ${Object.keys(this.tools).join(", ")}
     return recoverableErrors.some((err) => error.message.includes(err));
   }
 
-  outputResult(result, options) {
+  outputResult(result, options = {}) {
     if (options.json) {
       console.log(JSON.stringify(result, null, 2));
     } else {
       this.formatHumanOutput(result);
+    }
+
+    // Persist to session context asynchronously
+    if (this.sessionManager && this.sessionId) {
+      this.sessionManager
+        .appendEntry(this.sessionId, result)
+        .then(() =>
+          this.sessionManager.pruneIfNeeded(
+            this.sessionId,
+            this.config.contextWindowSize
+          )
+        )
+        .catch(() => {
+          /* silently ignore persistence errors */
+        });
     }
   }
 
