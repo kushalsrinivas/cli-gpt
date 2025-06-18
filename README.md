@@ -2,7 +2,17 @@
 
 ## Overview
 
-The enhanced CLI agent now operates with a structured 4-mode system that provides better error handling, structured JSON output, and a more systematic approach to task execution.
+The enhanced CLI agent now operates with a structured 4-mode system that provides better error handling, structured JSON output, and a more systematic approach to task execution. It supports both OpenRouter and OpenAI as AI providers.
+
+## Installation
+
+```bash
+# Install dependencies (includes OpenAI SDK)
+npm install
+
+# Configure your AI provider
+cliagent config
+```
 
 ## 4-Mode System
 
@@ -220,23 +230,77 @@ The agent can handle and recover from:
 }
 ```
 
-## Configuration
+## OpenAI Support
+
+The CLI Agent now supports both OpenRouter and OpenAI as AI providers, giving you flexibility in choosing your preferred AI service.
+
+### Supported Providers
+
+- **OpenRouter**: Access to multiple AI models through one API (default)
+- **OpenAI**: Direct access to OpenAI's models (GPT-4, GPT-3.5, etc.)
 
 ### Environment Variables
 
-- `OPENROUTER_API_KEY` - Your OpenRouter API key for AI functionality
+- `LLM_PROVIDER` - AI provider to use (`openrouter` or `openai`)
+- `OPENROUTER_API_KEY` - Your OpenRouter API key
+- `OPENAI_API_KEY` - Your OpenAI API key
+- `OPENAI_ORG` - Your OpenAI organization ID (optional)
 - `CLIAGENT_MAX_ITERATIONS` - Maximum iterations (default: 10)
 - `CLIAGENT_TIMEOUT` - Command timeout in ms (default: 30000)
 
 ### Setup
 
 ```bash
-# Configure API key
-node src/cli.js config
+# Configure provider and API keys interactively
+cliagent config
 
-# Or set environment variable
-export OPENROUTER_API_KEY="your-api-key-here"
+# Or set environment variables
+export LLM_PROVIDER="openai"
+export OPENAI_API_KEY="sk-your-openai-key-here"
+export OPENAI_ORG="org-your-organization-id"  # optional
 ```
+
+### Usage with Provider Selection
+
+```bash
+# Use OpenAI for a specific task
+cliagent run "analyze this code" --provider openai
+
+# Use OpenRouter for a specific task
+cliagent run "generate documentation" --provider openrouter
+
+# Switch provider in interactive mode
+cliagent interactive
+# Then type: /provider
+```
+
+### Provider-Specific Models
+
+**OpenAI Models:**
+
+- gpt-4-turbo
+- gpt-4
+- gpt-3.5-turbo
+- gpt-3.5-turbo-16k
+- And more...
+
+**OpenRouter Models:**
+
+- sarvamai/sarvam-m:free
+- deepseek/deepseek-r1-0528:free
+- anthropic/claude-3.5-sonnet
+- openai/gpt-4-turbo (via OpenRouter)
+- And many more...
+
+### Interactive Commands
+
+In interactive mode, you can now use:
+
+- `/provider` - Switch between OpenAI and OpenRouter
+- `/model` or `/switch` - Switch AI model within current provider
+- `/status` - View current provider and model settings
+
+## Configuration
 
 ## Testing
 

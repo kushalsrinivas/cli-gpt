@@ -19,7 +19,10 @@ class Config {
   loadConfig() {
     // Priority: environment variables > local config file > default values
     const defaults = {
+      llmProvider: "openrouter",
       openRouterApiKey: "your-openrouter-api-key-here",
+      openAiApiKey: "your-openai-api-key-here",
+      openAiOrg: "",
       defaultModel: "sarvamai/sarvam-m:free",
       maxTokens: 2000,
       temperature: 0.7,
@@ -45,10 +48,20 @@ class Config {
 
     // Merge with environment variables
     const envConfig = {
+      llmProvider:
+        process.env.LLM_PROVIDER ||
+        fileConfig.llmProvider ||
+        defaults.llmProvider,
       openRouterApiKey:
         process.env.OPENROUTER_API_KEY ||
         fileConfig.openRouterApiKey ||
         defaults.openRouterApiKey,
+      openAiApiKey:
+        process.env.OPENAI_API_KEY ||
+        fileConfig.openAiApiKey ||
+        defaults.openAiApiKey,
+      openAiOrg:
+        process.env.OPENAI_ORG || fileConfig.openAiOrg || defaults.openAiOrg,
       defaultModel:
         process.env.DEFAULT_MODEL ||
         fileConfig.defaultModel ||
@@ -95,6 +108,27 @@ class Config {
 
     const questions = [
       {
+        type: "list",
+        name: "llmProvider",
+        message: "Choose your AI provider:",
+        choices: [
+          {
+            name: "OpenRouter (Multiple models via one API)",
+            value: "openrouter",
+          },
+          { name: "OpenAI (Direct OpenAI API)", value: "openai" },
+        ],
+        default: this.config.llmProvider,
+      },
+    ];
+
+    const providerAnswer = await inquirer.prompt(questions);
+    const provider = providerAnswer.llmProvider;
+
+    const apiKeyQuestions = [];
+
+    if (provider === "openrouter") {
+      apiKeyQuestions.push({
         type: "input",
         name: "openRouterApiKey",
         message: "Enter your OpenRouter API key:",
@@ -111,7 +145,39 @@ class Config {
           }
           return true;
         },
-      },
+      });
+    } else {
+      apiKeyQuestions.push(
+        {
+          type: "input",
+          name: "openAiApiKey",
+          message: "Enter your OpenAI API key:",
+          default:
+            this.config.openAiApiKey !== "your-openai-api-key-here"
+              ? this.config.openAiApiKey
+              : "",
+          validate: (input) => {
+            if (!input.trim()) {
+              return "API key is required";
+            }
+            if (!input.startsWith("sk-")) {
+              return 'OpenAI API keys typically start with "sk-"';
+            }
+            return true;
+          },
+        },
+        {
+          type: "input",
+          name: "openAiOrg",
+          message: "Enter your OpenAI organization ID (optional):",
+          default: this.config.openAiOrg,
+        }
+      );
+    }
+
+    const apiKeyAnswers = await inquirer.prompt(apiKeyQuestions);
+
+    const additionalQuestions = [
       {
         type: "list",
         name: "defaultModel",
@@ -183,10 +249,15 @@ class Config {
       },
     ];
 
-    const answers = await inquirer.prompt(questions);
+    const answers = await inquirer.prompt(additionalQuestions);
 
     // Update config
-    this.config = { ...this.config, ...answers };
+    this.config = {
+      ...this.config,
+      llmProvider: provider,
+      ...apiKeyAnswers,
+      ...answers,
+    };
 
     // Save to file
     await this.saveConfig();
@@ -222,7 +293,10 @@ class Config {
 
   async createEnvFile() {
     const envContent = `# CLI Agent Configuration
+LLM_PROVIDER=${this.config.llmProvider}
 OPENROUTER_API_KEY=${this.config.openRouterApiKey}
+OPENAI_API_KEY=${this.config.openAiApiKey}
+OPENAI_ORG=${this.config.openAiOrg}
 DEFAULT_MODEL=${this.config.defaultModel}
 MAX_TOKENS=${this.config.maxTokens}
 TEMPERATURE=${this.config.temperature}
@@ -241,8 +315,20 @@ SESSIONS_DIR=${this.config.sessionsDir}
     }
   }
 
+  get llmProvider() {
+    return this.config.llmProvider;
+  }
+
   get openRouterApiKey() {
     return this.config.openRouterApiKey;
+  }
+
+  get openAiApiKey() {
+    return this.config.openAiApiKey;
+  }
+
+  get openAiOrg() {
+    return this.config.openAiOrg;
   }
 
   get defaultModel() {
@@ -282,9 +368,7 @@ SESSIONS_DIR=${this.config.sessionsDir}
   async checkAndInitialize() {
     const envExists = fs.existsSync(this.envFile);
     const configExists = fs.existsSync(this.configFile);
-    const hasValidApiKey =
-      this.config.openRouterApiKey &&
-      this.config.openRouterApiKey !== "your-openrouter-api-key-here";
+    const hasValidApiKey = this.hasValidApiKey();
 
     // If no config exists or API key is not set, run initialization
     if (!envExists && !configExists) {
@@ -298,10 +382,24 @@ SESSIONS_DIR=${this.config.sessionsDir}
 
       await this.runInitialSetup();
     } else if (!hasValidApiKey) {
-      console.log(chalk.yellow("⚠️ OpenRouter API key not configured."));
+      console.log(chalk.yellow("⚠️ API key not configured."));
       console.log(chalk.cyan("Let's set up your API key...\n"));
 
       await this.runInitialSetup();
+    }
+  }
+
+  hasValidApiKey() {
+    if (this.config.llmProvider === "openai") {
+      return (
+        this.config.openAiApiKey &&
+        this.config.openAiApiKey !== "your-openai-api-key-here"
+      );
+    } else {
+      return (
+        this.config.openRouterApiKey &&
+        this.config.openRouterApiKey !== "your-openrouter-api-key-here"
+      );
     }
   }
 
@@ -311,8 +409,29 @@ SESSIONS_DIR=${this.config.sessionsDir}
       chalk.gray("This will create a .env file in your current directory.\n")
     );
 
-    const questions = [
+    const providerQuestions = [
       {
+        type: "list",
+        name: "llmProvider",
+        message: "Choose your AI provider:",
+        choices: [
+          {
+            name: "OpenRouter (Multiple models via one API)",
+            value: "openrouter",
+          },
+          { name: "OpenAI (Direct OpenAI API)", value: "openai" },
+        ],
+        default: "openrouter",
+      },
+    ];
+
+    const providerAnswer = await inquirer.prompt(providerQuestions);
+    const provider = providerAnswer.llmProvider;
+
+    const apiKeyQuestions = [];
+
+    if (provider === "openrouter") {
+      apiKeyQuestions.push({
         type: "input",
         name: "openRouterApiKey",
         message: "Enter your OpenRouter API key:",
@@ -325,7 +444,35 @@ SESSIONS_DIR=${this.config.sessionsDir}
           }
           return true;
         },
-      },
+      });
+    } else {
+      apiKeyQuestions.push(
+        {
+          type: "input",
+          name: "openAiApiKey",
+          message: "Enter your OpenAI API key:",
+          validate: (input) => {
+            if (!input.trim()) {
+              return "API key is required";
+            }
+            if (!input.startsWith("sk-")) {
+              return 'OpenAI API keys typically start with "sk-"';
+            }
+            return true;
+          },
+        },
+        {
+          type: "input",
+          name: "openAiOrg",
+          message: "Enter your OpenAI organization ID (optional):",
+          default: "",
+        }
+      );
+    }
+
+    const apiKeyAnswers = await inquirer.prompt(apiKeyQuestions);
+
+    const additionalQuestions = [
       {
         type: "list",
         name: "defaultModel",
@@ -416,10 +563,15 @@ SESSIONS_DIR=${this.config.sessionsDir}
       },
     ];
 
-    const answers = await inquirer.prompt(questions);
+    const answers = await inquirer.prompt(additionalQuestions);
 
     // Update config
-    this.config = { ...this.config, ...answers };
+    this.config = {
+      ...this.config,
+      llmProvider: provider,
+      ...apiKeyAnswers,
+      ...answers,
+    };
 
     // Always create .env file during initial setup
     await this.createEnvFile();
@@ -439,26 +591,87 @@ SESSIONS_DIR=${this.config.sessionsDir}
   }
 
   // Get available models for switching
-  getAvailableModels() {
-    return [
-      { name: "Sarvam-M (Free)", value: "sarvamai/sarvam-m:free" },
-      { name: "DeepSeek R1 (Free)", value: "deepseek/deepseek-r1-0528:free" },
+  getAvailableModels(provider = null) {
+    const currentProvider = provider || this.config.llmProvider;
+
+    if (currentProvider === "openai") {
+      return [
+        { name: "GPT-4 Turbo", value: "gpt-4-turbo" },
+        { name: "GPT-4", value: "gpt-4" },
+        { name: "GPT-3.5 Turbo", value: "gpt-3.5-turbo" },
+        { name: "GPT-3.5 Turbo 16k", value: "gpt-3.5-turbo-16k" },
+        { name: "GPT-4 32k", value: "gpt-4-32k" },
+        { name: "GPT-4 1106 Preview", value: "gpt-4-1106-preview" },
+        { name: "GPT-4 0125 Preview", value: "gpt-4-0125-preview" },
+        { name: "GPT-3.5 Turbo 1106", value: "gpt-3.5-turbo-1106" },
+        { name: "GPT-3.5 Turbo 0125", value: "gpt-3.5-turbo-0125" },
+      ];
+    } else {
+      return [
+        { name: "Sarvam-M (Free)", value: "sarvamai/sarvam-m:free" },
+        { name: "DeepSeek R1 (Free)", value: "deepseek/deepseek-r1-0528:free" },
+        {
+          name: "DeepSeek R1 Qwen3 8B (Free)",
+          value: "deepseek/deepseek-r1-0528-qwen3-8b:free",
+        },
+        { name: "Claude 3.5 Sonnet", value: "anthropic/claude-3.5-sonnet" },
+        { name: "Claude 3 Haiku", value: "anthropic/claude-3-haiku" },
+        { name: "GPT-4 Turbo", value: "openai/gpt-4-turbo" },
+        { name: "GPT-3.5 Turbo", value: "openai/gpt-3.5-turbo" },
+        { name: "Llama 2 70B", value: "meta-llama/llama-2-70b-chat" },
+        { name: "Mixtral 8x7B", value: "mistralai/mixtral-8x7b-instruct" },
+      ];
+    }
+  }
+
+  // Switch provider temporarily (for current session)
+  async switchProvider() {
+    console.log(chalk.blue("\n🔄 Provider Switcher"));
+    console.log(chalk.gray(`Current provider: ${this.config.llmProvider}`));
+
+    const { newProvider } = await inquirer.prompt([
       {
-        name: "DeepSeek R1 Qwen3 8B (Free)",
-        value: "deepseek/deepseek-r1-0528-qwen3-8b:free",
+        type: "list",
+        name: "newProvider",
+        message: "Choose a new AI provider:",
+        choices: [
+          {
+            name: "OpenRouter (Multiple models via one API)",
+            value: "openrouter",
+          },
+          { name: "OpenAI (Direct OpenAI API)", value: "openai" },
+        ],
+        default: this.config.llmProvider,
       },
-      { name: "Claude 3.5 Sonnet", value: "anthropic/claude-3.5-sonnet" },
-      { name: "Claude 3 Haiku", value: "anthropic/claude-3-haiku" },
-      { name: "GPT-4 Turbo", value: "openai/gpt-4-turbo" },
-      { name: "GPT-3.5 Turbo", value: "openai/gpt-3.5-turbo" },
-      { name: "Llama 2 70B", value: "meta-llama/llama-2-70b-chat" },
-      { name: "Mixtral 8x7B", value: "mistralai/mixtral-8x7b-instruct" },
-    ];
+    ]);
+
+    if (newProvider !== this.config.llmProvider) {
+      this.config.llmProvider = newProvider;
+
+      // Set appropriate default model for the provider
+      if (newProvider === "openai") {
+        this.config.defaultModel = "gpt-3.5-turbo";
+      } else {
+        this.config.defaultModel = "sarvamai/sarvam-m:free";
+      }
+
+      console.log(chalk.green(`✅ Provider switched to: ${newProvider}`));
+      console.log(chalk.green(`✅ Model set to: ${this.config.defaultModel}`));
+      console.log(
+        chalk.gray("This change is temporary for this session only.")
+      );
+      console.log(chalk.gray("To make it permanent, run: cliagent config\n"));
+      return true;
+    } else {
+      console.log(chalk.yellow("No change made.\n"));
+      return false;
+    }
   }
 
   // Switch model temporarily (for current session)
   async switchModel() {
     console.log(chalk.blue("\n🔄 Model Switcher"));
+    console.log(chalk.gray(`Current provider: ${this.config.llmProvider}`));
     console.log(chalk.gray(`Current model: ${this.config.defaultModel}`));
 
     const { newModel } = await inquirer.prompt([
@@ -504,7 +717,10 @@ SESSIONS_DIR=${this.config.sessionsDir}
       } else {
         // Create new .env file
         envContent = `# CLI Agent Configuration
+LLM_PROVIDER=${this.config.llmProvider}
 OPENROUTER_API_KEY=${this.config.openRouterApiKey}
+OPENAI_API_KEY=${this.config.openAiApiKey}
+OPENAI_ORG=${this.config.openAiOrg}
 DEFAULT_MODEL=${model}
 MAX_TOKENS=${this.config.maxTokens}
 TEMPERATURE=${this.config.temperature}

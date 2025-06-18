@@ -5,7 +5,7 @@ import path from "path";
 import chalk from "chalk";
 import inquirer from "inquirer";
 import readline from "readline";
-import { OpenRouterClient } from "./openrouter.js";
+import { getProvider } from "./providerFactory.js";
 import { SessionManager } from "./sessionManager.js";
 import { Retriever } from "./retriever.js";
 
@@ -14,7 +14,7 @@ const execAsync = promisify(exec);
 export class Agent {
   constructor(config, sessionId = null) {
     this.config = config;
-    this.openRouter = new OpenRouterClient(config.openRouterApiKey);
+    this.llm = getProvider(config);
 
     // Session & RAG setup
     this.sessionManager = new SessionManager(config);
@@ -164,6 +164,9 @@ export class Agent {
       iterations: this.currentIteration,
       finalOutput: context.finalOutput || "Task execution completed",
       summary: this.generateSummary(context),
+      curated: await this.curateOutput(
+        context.finalOutput || "Task execution completed"
+      ),
     };
 
     this.outputResult(outputResult, options);
@@ -180,7 +183,7 @@ export class Agent {
     const thinkingPrompt = this.buildThinkingPrompt(context, ragSnippets);
 
     try {
-      const aiResponse = await this.openRouter.chat([
+      const aiResponse = await this.llm.chat([
         {
           role: "system",
           content: this.getSystemPrompt(),
@@ -430,6 +433,8 @@ Available tools: ${Object.keys(this.tools).join(", ")}
       "EACCES", // Permission denied
       "ETIMEDOUT", // Timeout
       "Command failed", // Command execution failure
+      "OpenAIError", // OpenAI API errors
+      "RateLimitError", // Rate limit errors
     ];
 
     return recoverableErrors.some((err) => error.message.includes(err));
@@ -507,6 +512,10 @@ Available tools: ${Object.keys(this.tools).join(", ")}
         console.log(chalk.green(`🎯 [${timestamp}] FINAL OUTPUT`));
         console.log(chalk.white("Result:"), result.finalOutput);
         console.log(chalk.gray(`Completed in ${result.iterations} iterations`));
+        if (result.curated) {
+          console.log(chalk.blue("\n📝 Curated Summary:"));
+          console.log(result.curated);
+        }
         break;
 
       case "ERROR":
@@ -557,6 +566,11 @@ Available tools: ${Object.keys(this.tools).join(", ")}
           continue;
         }
 
+        if (trimmedTask === "/provider") {
+          await this.handleProviderSwitch();
+          continue;
+        }
+
         if (trimmedTask === "/help") {
           this.showInteractiveHelp();
           continue;
@@ -588,12 +602,38 @@ Available tools: ${Object.keys(this.tools).join(", ")}
     }
   }
 
+  async handleProviderSwitch() {
+    try {
+      const switched = await this.config.switchProvider();
+      if (switched) {
+        // Recreate the LLM client with the new provider
+        this.llm = getProvider(this.config);
+
+        // Ask if user wants to make this change permanent
+        const { makePermanent } = await inquirer.prompt([
+          {
+            type: "confirm",
+            name: "makePermanent",
+            message: "Make this provider change permanent in .env file?",
+            default: false,
+          },
+        ]);
+
+        if (makePermanent) {
+          await this.config.updateEnvModel(this.config.defaultModel);
+        }
+      }
+    } catch (error) {
+      console.error(chalk.red("❌ Error switching provider:"), error.message);
+    }
+  }
+
   async handleModelSwitch() {
     try {
       const switched = await this.config.switchModel();
       if (switched) {
-        // Update the OpenRouter client with the new model
-        this.openRouter.setModel(this.config.defaultModel);
+        // Update the LLM client with the new model
+        this.llm.setModel(this.config.defaultModel);
 
         // Ask if user wants to make this change permanent
         const { makePermanent } = await inquirer.prompt([
@@ -620,6 +660,7 @@ Available tools: ${Object.keys(this.tools).join(", ")}
     console.log(chalk.gray("  /help     - Show this help message"));
     console.log(chalk.gray("  /switch   - Switch AI model"));
     console.log(chalk.gray("  /model    - Switch AI model (alias)"));
+    console.log(chalk.gray("  /provider - Switch AI provider"));
     console.log(chalk.gray("  /status   - Show current configuration"));
     console.log(chalk.gray("  /quit     - Exit the application"));
     console.log(chalk.gray("  /exit     - Exit the application"));
@@ -634,6 +675,7 @@ Available tools: ${Object.keys(this.tools).join(", ")}
   showStatus() {
     console.log(chalk.blue("\n📊 Current Status"));
     console.log(chalk.white("Configuration:"));
+    console.log(chalk.gray(`  Provider: ${this.config.llmProvider}`));
     console.log(chalk.gray(`  Model: ${this.config.defaultModel}`));
     console.log(chalk.gray(`  Max Tokens: ${this.config.maxTokens}`));
     console.log(chalk.gray(`  Temperature: ${this.config.temperature}`));
@@ -910,6 +952,28 @@ Be thorough in your thinking, consider edge cases, and provide clear reasoning f
         success: false,
         error: error.message,
       };
+    }
+  }
+
+  async curateOutput(output) {
+    try {
+      const prompt = `You are an assistant tasked with creating a concise, well-structured summary of the following raw task output. Focus on what was achieved, highlight any key results, and suggest clear next steps if appropriate. Keep it short (3-6 sentences) and easy to read.\n\nRAW OUTPUT:\n${
+        typeof output === "string" ? output : JSON.stringify(output, null, 2)
+      }\n\nCURATED SUMMARY:`;
+
+      const response = await this.llm.chat([
+        {
+          role: "system",
+          content:
+            "You produce neat, human-friendly summaries for CLI outputs. Use markdown bullets where helpful.",
+        },
+        { role: "user", content: prompt },
+      ]);
+
+      return (response || "").trim();
+    } catch (err) {
+      // Fail gracefully – don't block the main flow
+      return `Could not generate curated summary: ${err.message}`;
     }
   }
 }

@@ -15,7 +15,7 @@ program
   .description(
     "CLI agentic tool for executing commands and managing files with AI"
   )
-  .version("1.1.0");
+  .version("1.2.0");
 
 program
   .command("run")
@@ -30,16 +30,26 @@ program
     "-s, --session <id>",
     "Session ID to use (will be created if not exists)"
   )
+  .option(
+    "-p, --provider <openrouter|openai>",
+    "AI provider to use (openrouter or openai)"
+  )
   .action(async (task, options) => {
     try {
       // Check if initialization is needed
       await config.checkAndInitialize();
+
+      // Override provider if specified
+      if (options.provider) {
+        config.config.llmProvider = options.provider;
+      }
 
       const sessionId = options.session || null;
 
       if (!options.json) {
         console.log(chalk.blue("🤖 Starting CLI Agent..."));
         console.log(chalk.gray(`Task: ${task}`));
+        console.log(chalk.gray(`Provider: ${config.config.llmProvider}`));
         if (sessionId) {
           console.log(chalk.gray(`Session: ${sessionId}`));
         }
