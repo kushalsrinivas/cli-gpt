@@ -177,32 +177,51 @@ class Config {
 
     const apiKeyAnswers = await inquirer.prompt(apiKeyQuestions);
 
+    // Model selection based on provider
+    let modelChoices = [];
+    if (provider === "openai") {
+      modelChoices = [
+        { name: "GPT-4 Turbo (Recommended)", value: "gpt-4-turbo" },
+        { name: "GPT-4", value: "gpt-4" },
+        { name: "GPT-3.5 Turbo", value: "gpt-3.5-turbo" },
+        { name: "GPT-3.5 Turbo 16K", value: "gpt-3.5-turbo-16k" },
+        { name: "GPT-4 32K", value: "gpt-4-32k" },
+        { name: "GPT-4 1106 Preview", value: "gpt-4-1106-preview" },
+        { name: "GPT-4 0125 Preview", value: "gpt-4-0125-preview" },
+        { name: "GPT-3.5 Turbo 1106", value: "gpt-3.5-turbo-1106" },
+        { name: "GPT-3.5 Turbo 0125", value: "gpt-3.5-turbo-0125" },
+      ];
+    } else {
+      modelChoices = [
+        {
+          name: "Sarvam-M (Free, Recommended)",
+          value: "sarvamai/sarvam-m:free",
+        },
+        {
+          name: "DeepSeek R1 (Free)",
+          value: "deepseek/deepseek-r1-0528:free",
+        },
+        {
+          name: "DeepSeek R1 Qwen3 8B (Free)",
+          value: "deepseek/deepseek-r1-0528-qwen3-8b:free",
+        },
+        { name: "Claude 3.5 Sonnet", value: "anthropic/claude-3.5-sonnet" },
+        { name: "Claude 3 Haiku", value: "anthropic/claude-3-haiku" },
+        { name: "GPT-4 Turbo", value: "openai/gpt-4-turbo" },
+        { name: "GPT-3.5 Turbo", value: "openai/gpt-3.5-turbo" },
+        { name: "Llama 2 70B", value: "meta-llama/llama-2-70b-chat" },
+        { name: "Mixtral 8x7B", value: "mistralai/mixtral-8x7b-instruct" },
+      ];
+    }
+
     const additionalQuestions = [
       {
         type: "list",
         name: "defaultModel",
         message: "Choose default AI model:",
-        choices: [
-          {
-            name: "Sarvam-M (Free, Recommended)",
-            value: "sarvamai/sarvam-m:free",
-          },
-          {
-            name: "DeepSeek R1 (Free)",
-            value: "deepseek/deepseek-r1-0528:free",
-          },
-          {
-            name: "DeepSeek R1 Qwen3 8B (Free)",
-            value: "deepseek/deepseek-r1-0528-qwen3-8b:free",
-          },
-          { name: "Claude 3.5 Sonnet", value: "anthropic/claude-3.5-sonnet" },
-          { name: "Claude 3 Haiku", value: "anthropic/claude-3-haiku" },
-          { name: "GPT-4 Turbo", value: "openai/gpt-4-turbo" },
-          { name: "GPT-3.5 Turbo", value: "openai/gpt-3.5-turbo" },
-          { name: "Llama 2 70B", value: "meta-llama/llama-2-70b-chat" },
-          { name: "Mixtral 8x7B", value: "mistralai/mixtral-8x7b-instruct" },
-        ],
-        default: this.config.defaultModel,
+        choices: modelChoices,
+        default:
+          provider === "openai" ? "gpt-3.5-turbo" : this.config.defaultModel,
       },
       {
         type: "number",
@@ -472,50 +491,69 @@ SESSIONS_DIR=${this.config.sessionsDir}
 
     const apiKeyAnswers = await inquirer.prompt(apiKeyQuestions);
 
+    // Model selection based on provider
+    let modelChoices = [];
+    if (provider === "openai") {
+      modelChoices = [
+        { name: "GPT-4 Turbo (Recommended)", value: "gpt-4-turbo" },
+        { name: "GPT-4", value: "gpt-4" },
+        { name: "GPT-3.5 Turbo", value: "gpt-3.5-turbo" },
+        { name: "GPT-3.5 Turbo 16K", value: "gpt-3.5-turbo-16k" },
+        { name: "GPT-4 32K", value: "gpt-4-32k" },
+        { name: "GPT-4 1106 Preview", value: "gpt-4-1106-preview" },
+        { name: "GPT-4 0125 Preview", value: "gpt-4-0125-preview" },
+        { name: "GPT-3.5 Turbo 1106", value: "gpt-3.5-turbo-1106" },
+        { name: "GPT-3.5 Turbo 0125", value: "gpt-3.5-turbo-0125" },
+      ];
+    } else {
+      modelChoices = [
+        {
+          name: "Sarvam-M (Free, Recommended for beginners)",
+          value: "sarvamai/sarvam-m:free",
+        },
+        {
+          name: "DeepSeek R1 (Free, Good for coding)",
+          value: "deepseek/deepseek-r1-0528:free",
+        },
+        {
+          name: "DeepSeek R1 Qwen3 8B (Free, Fast)",
+          value: "deepseek/deepseek-r1-0528-qwen3-8b:free",
+        },
+        {
+          name: "Claude 3.5 Sonnet (Premium, Excellent)",
+          value: "anthropic/claude-3.5-sonnet",
+        },
+        {
+          name: "Claude 3 Haiku (Premium, Fast)",
+          value: "anthropic/claude-3-haiku",
+        },
+        {
+          name: "GPT-4 Turbo (Premium, Powerful)",
+          value: "openai/gpt-4-turbo",
+        },
+        {
+          name: "GPT-3.5 Turbo (Premium, Balanced)",
+          value: "openai/gpt-3.5-turbo",
+        },
+        {
+          name: "Llama 2 70B (Good for general tasks)",
+          value: "meta-llama/llama-2-70b-chat",
+        },
+        {
+          name: "Mixtral 8x7B (Good for coding)",
+          value: "mistralai/mixtral-8x7b-instruct",
+        },
+      ];
+    }
+
     const additionalQuestions = [
       {
         type: "list",
         name: "defaultModel",
         message: "Choose your preferred AI model:",
-        choices: [
-          {
-            name: "Sarvam-M (Free, Recommended for beginners)",
-            value: "sarvamai/sarvam-m:free",
-          },
-          {
-            name: "DeepSeek R1 (Free, Good for coding)",
-            value: "deepseek/deepseek-r1-0528:free",
-          },
-          {
-            name: "DeepSeek R1 Qwen3 8B (Free, Fast)",
-            value: "deepseek/deepseek-r1-0528-qwen3-8b:free",
-          },
-          {
-            name: "Claude 3.5 Sonnet (Premium, Excellent)",
-            value: "anthropic/claude-3.5-sonnet",
-          },
-          {
-            name: "Claude 3 Haiku (Premium, Fast)",
-            value: "anthropic/claude-3-haiku",
-          },
-          {
-            name: "GPT-4 Turbo (Premium, Powerful)",
-            value: "openai/gpt-4-turbo",
-          },
-          {
-            name: "GPT-3.5 Turbo (Premium, Balanced)",
-            value: "openai/gpt-3.5-turbo",
-          },
-          {
-            name: "Llama 2 70B (Good for general tasks)",
-            value: "meta-llama/llama-2-70b-chat",
-          },
-          {
-            name: "Mixtral 8x7B (Good for coding)",
-            value: "mistralai/mixtral-8x7b-instruct",
-          },
-        ],
-        default: "sarvamai/sarvam-m:free",
+        choices: modelChoices,
+        default:
+          provider === "openai" ? "gpt-3.5-turbo" : "sarvamai/sarvam-m:free",
       },
       {
         type: "number",
@@ -590,38 +628,16 @@ SESSIONS_DIR=${this.config.sessionsDir}
     );
   }
 
-  // Get available models for switching
-  getAvailableModels(provider = null) {
-    const currentProvider = provider || this.config.llmProvider;
+  // Get available models for switching (delegated to provider)
+  async getAvailableModels(provider = null) {
+    const { createProvider } = await import("./providerFactory.js");
+    const provInstance = createProvider(this.config);
+    const models = provInstance.getAvailableModels();
 
-    if (currentProvider === "openai") {
-      return [
-        { name: "GPT-4 Turbo", value: "gpt-4-turbo" },
-        { name: "GPT-4", value: "gpt-4" },
-        { name: "GPT-3.5 Turbo", value: "gpt-3.5-turbo" },
-        { name: "GPT-3.5 Turbo 16k", value: "gpt-3.5-turbo-16k" },
-        { name: "GPT-4 32k", value: "gpt-4-32k" },
-        { name: "GPT-4 1106 Preview", value: "gpt-4-1106-preview" },
-        { name: "GPT-4 0125 Preview", value: "gpt-4-0125-preview" },
-        { name: "GPT-3.5 Turbo 1106", value: "gpt-3.5-turbo-1106" },
-        { name: "GPT-3.5 Turbo 0125", value: "gpt-3.5-turbo-0125" },
-      ];
-    } else {
-      return [
-        { name: "Sarvam-M (Free)", value: "sarvamai/sarvam-m:free" },
-        { name: "DeepSeek R1 (Free)", value: "deepseek/deepseek-r1-0528:free" },
-        {
-          name: "DeepSeek R1 Qwen3 8B (Free)",
-          value: "deepseek/deepseek-r1-0528-qwen3-8b:free",
-        },
-        { name: "Claude 3.5 Sonnet", value: "anthropic/claude-3.5-sonnet" },
-        { name: "Claude 3 Haiku", value: "anthropic/claude-3-haiku" },
-        { name: "GPT-4 Turbo", value: "openai/gpt-4-turbo" },
-        { name: "GPT-3.5 Turbo", value: "openai/gpt-3.5-turbo" },
-        { name: "Llama 2 70B", value: "meta-llama/llama-2-70b-chat" },
-        { name: "Mixtral 8x7B", value: "mistralai/mixtral-8x7b-instruct" },
-      ];
-    }
+    // Normalize to Inquirer choice objects
+    return models.map((m) =>
+      typeof m === "string" ? { name: m, value: m } : m
+    );
   }
 
   // Switch provider temporarily (for current session)
@@ -648,15 +664,60 @@ SESSIONS_DIR=${this.config.sessionsDir}
     if (newProvider !== this.config.llmProvider) {
       this.config.llmProvider = newProvider;
 
-      // Set appropriate default model for the provider
+      // Ask for model selection based on the new provider
+      let modelChoices = [];
       if (newProvider === "openai") {
-        this.config.defaultModel = "gpt-3.5-turbo";
+        modelChoices = [
+          { name: "GPT-4 Turbo (Recommended)", value: "gpt-4-turbo" },
+          { name: "GPT-4", value: "gpt-4" },
+          { name: "GPT-3.5 Turbo", value: "gpt-3.5-turbo" },
+          { name: "GPT-3.5 Turbo 16K", value: "gpt-3.5-turbo-16k" },
+          { name: "GPT-4 32K", value: "gpt-4-32k" },
+          { name: "GPT-4 1106 Preview", value: "gpt-4-1106-preview" },
+          { name: "GPT-4 0125 Preview", value: "gpt-4-0125-preview" },
+          { name: "GPT-3.5 Turbo 1106", value: "gpt-3.5-turbo-1106" },
+          { name: "GPT-3.5 Turbo 0125", value: "gpt-3.5-turbo-0125" },
+        ];
       } else {
-        this.config.defaultModel = "sarvamai/sarvam-m:free";
+        modelChoices = [
+          {
+            name: "Sarvam-M (Free, Recommended)",
+            value: "sarvamai/sarvam-m:free",
+          },
+          {
+            name: "DeepSeek R1 (Free)",
+            value: "deepseek/deepseek-r1-0528:free",
+          },
+          {
+            name: "DeepSeek R1 Qwen3 8B (Free)",
+            value: "deepseek/deepseek-r1-0528-qwen3-8b:free",
+          },
+          { name: "Claude 3.5 Sonnet", value: "anthropic/claude-3.5-sonnet" },
+          { name: "Claude 3 Haiku", value: "anthropic/claude-3-haiku" },
+          { name: "GPT-4 Turbo", value: "openai/gpt-4-turbo" },
+          { name: "GPT-3.5 Turbo", value: "openai/gpt-3.5-turbo" },
+          { name: "Llama 2 70B", value: "meta-llama/llama-2-70b-chat" },
+          { name: "Mixtral 8x7B", value: "mistralai/mixtral-8x7b-instruct" },
+        ];
       }
 
+      const { selectedModel } = await inquirer.prompt([
+        {
+          type: "list",
+          name: "selectedModel",
+          message: `Choose a model for ${newProvider}:`,
+          choices: modelChoices,
+          default:
+            newProvider === "openai"
+              ? "gpt-3.5-turbo"
+              : "sarvamai/sarvam-m:free",
+        },
+      ]);
+
+      this.config.defaultModel = selectedModel;
+
       console.log(chalk.green(`✅ Provider switched to: ${newProvider}`));
-      console.log(chalk.green(`✅ Model set to: ${this.config.defaultModel}`));
+      console.log(chalk.green(`✅ Model set to: ${selectedModel}`));
       console.log(
         chalk.gray("This change is temporary for this session only.")
       );
@@ -674,12 +735,13 @@ SESSIONS_DIR=${this.config.sessionsDir}
     console.log(chalk.gray(`Current provider: ${this.config.llmProvider}`));
     console.log(chalk.gray(`Current model: ${this.config.defaultModel}`));
 
+    const availableModels = await this.getAvailableModels();
     const { newModel } = await inquirer.prompt([
       {
         type: "list",
         name: "newModel",
         message: "Choose a new AI model:",
-        choices: this.getAvailableModels(),
+        choices: availableModels,
         default: this.config.defaultModel,
       },
     ]);
@@ -687,10 +749,21 @@ SESSIONS_DIR=${this.config.sessionsDir}
     if (newModel !== this.config.defaultModel) {
       this.config.defaultModel = newModel;
       console.log(chalk.green(`✅ Model switched to: ${newModel}`));
-      console.log(
-        chalk.gray("This change is temporary for this session only.")
-      );
-      console.log(chalk.gray("To make it permanent, run: cliagent config\n"));
+      const { persist } = await inquirer.prompt([
+        {
+          type: "confirm",
+          name: "persist",
+          message: "Update .env with this model?",
+          default: false,
+        },
+      ]);
+      if (persist) {
+        await this.updateEnvModel(newModel);
+      } else {
+        console.log(
+          chalk.gray("This change is temporary for this session only.")
+        );
+      }
       return true;
     } else {
       console.log(chalk.yellow("No change made.\n"));
@@ -735,6 +808,60 @@ SESSIONS_DIR=${this.config.sessionsDir}
       await fs.writeFile(this.envFile, envContent);
       this.config.defaultModel = model;
       console.log(chalk.green("✅ Model updated in .env file"));
+    } catch (error) {
+      console.error(chalk.red("❌ Failed to update .env file:"), error.message);
+    }
+  }
+
+  // Update .env file with new provider and model
+  async updateEnvProvider(provider, model) {
+    try {
+      let envContent = "";
+
+      if (fs.existsSync(this.envFile)) {
+        envContent = await fs.readFile(this.envFile, "utf8");
+
+        // Replace existing LLM_PROVIDER line or add it
+        if (envContent.includes("LLM_PROVIDER=")) {
+          envContent = envContent.replace(
+            /LLM_PROVIDER=.*$/m,
+            `LLM_PROVIDER=${provider}`
+          );
+        } else {
+          envContent += `\nLLM_PROVIDER=${provider}`;
+        }
+
+        // Replace existing DEFAULT_MODEL line or add it
+        if (envContent.includes("DEFAULT_MODEL=")) {
+          envContent = envContent.replace(
+            /DEFAULT_MODEL=.*$/m,
+            `DEFAULT_MODEL=${model}`
+          );
+        } else {
+          envContent += `\nDEFAULT_MODEL=${model}`;
+        }
+      } else {
+        // Create new .env file
+        envContent = `# CLI Agent Configuration
+LLM_PROVIDER=${provider}
+OPENROUTER_API_KEY=${this.config.openRouterApiKey}
+OPENAI_API_KEY=${this.config.openAiApiKey}
+OPENAI_ORG=${this.config.openAiOrg}
+DEFAULT_MODEL=${model}
+MAX_TOKENS=${this.config.maxTokens}
+TEMPERATURE=${this.config.temperature}
+VERBOSE=${this.config.verbose}
+CONTEXT_WINDOW_SIZE=${this.config.contextWindowSize}
+RAG_TOP_K=${this.config.ragTopK}
+RAG_STRATEGY=${this.config.ragRetrievalStrategy}
+SESSIONS_DIR=${this.config.sessionsDir}
+`;
+      }
+
+      await fs.writeFile(this.envFile, envContent);
+      this.config.llmProvider = provider;
+      this.config.defaultModel = model;
+      console.log(chalk.green("✅ Provider and model updated in .env file"));
     } catch (error) {
       console.error(chalk.red("❌ Failed to update .env file:"), error.message);
     }

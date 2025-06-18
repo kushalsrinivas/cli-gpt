@@ -32,6 +32,7 @@ export class SessionManager {
     await this.ensureSessionDir(sessionId);
     const fp = this.getContextFile(sessionId);
     await fs.appendFile(fp, JSON.stringify(obj) + "\n");
+    await this.pruneIfNeeded(sessionId, this.config.contextWindowSize);
   }
 
   async readEntries(sessionId) {

@@ -11,7 +11,8 @@ export class OpenRouterClient {
       headers: {
         Authorization: `Bearer ${this.apiKey}`,
         "Content-Type": "application/json",
-        "HTTP-Referer": "https://github.com/your-username/cliagent",
+        // OpenRouter expects a standard Referer header: https://openrouter.ai/docs#referer_header
+        Referer: "https://github.com/your-username/cliagent",
         "X-Title": "CLI Agent Tool",
       },
     });

@@ -150,6 +150,35 @@ cliagent config
 7. **searchFiles(pattern, directory)** - Search for files matching patterns
 8. **getSystemInfo()** - Get comprehensive system information
 
+### PDF Utilities
+
+9. **readPdf(filePath)** - Extract text & metadata from a PDF.
+10. **createPdf(content, outputPath)** - Generate a one-page PDF from plain text.
+11. **mergePdfs(files, outputPath)** - Merge multiple PDFs.
+12. **splitPdf(filePath, ranges, outputDir)** - Split a PDF into pages or ranges.
+13. **addPdfWatermark(filePath, watermarkText, outputPath)** - Apply watermark across pages.
+
+### File Conversion
+
+14. **csvToJson(csvPath, jsonPath)** – Convert CSV ➜ JSON.
+15. **jsonToCsv(jsonPath, csvPath)** – Convert JSON ➜ CSV.
+16. **xmlToJson(xmlPath, jsonPath)** – Convert XML ➜ JSON.
+17. **jsonToXml(jsonPath, xmlPath)** – Convert JSON ➜ XML.
+18. **markdownToPdf(mdPath, pdfPath)** – Render Markdown ➜ PDF.
+
+#### Example Conversions
+
+```bash
+# Extract PDF text
+cliagent run "read.pdf filePath=report.pdf" --json
+
+# Convert CSV to JSON
+cliagent run "csvToJson csvPath=data.csv jsonPath=data.json" --json
+
+# Markdown to PDF
+cliagent run "markdownToPdf mdPath=README.md pdfPath=README.pdf" --json
+```
+
 ## Usage Examples
 
 ### Interactive Mode (Recommended)

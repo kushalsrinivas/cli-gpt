@@ -58,6 +58,15 @@ program
       const agent = new Agent(config, sessionId);
       const result = await agent.execute(task, options);
 
+      if (
+        result &&
+        (result.mode === "ERROR" || result.mode === "FATAL_ERROR")
+      ) {
+        // Agent already printed the error details; just propagate exit code.
+        process.exitCode = 1;
+        return;
+      }
+
       if (!options.json) {
         console.log(chalk.green("✅ Task completed successfully!"));
       }

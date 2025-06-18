@@ -31,14 +31,14 @@ export class OpenAiClient {
     } catch (error) {
       if (error.status) {
         throw new Error(
-          `OpenAI API Error: ${error.status} - ${
-            error.message || "Unknown error"
-          }`
+          `OpenAIError: ${error.status} - ${error.message || "Unknown error"}`
         );
       } else if (error.code === "ENOTFOUND" || error.code === "ECONNREFUSED") {
-        throw new Error("Network error: Unable to reach OpenAI API");
+        throw new Error(
+          "OpenAIError: Network error – unable to reach OpenAI API"
+        );
       } else {
-        throw new Error(`Request error: ${error.message}`);
+        throw new Error(`OpenAIError: ${error.message}`);
       }
     }
   }

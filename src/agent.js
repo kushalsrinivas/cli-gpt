@@ -8,6 +8,7 @@ import readline from "readline";
 import { getProvider } from "./providerFactory.js";
 import { SessionManager } from "./sessionManager.js";
 import { Retriever } from "./retriever.js";
+import * as tools from "./tools/index.js";
 
 const execAsync = promisify(exec);
 
@@ -21,15 +22,7 @@ export class Agent {
     this.sessionId = sessionId || this.sessionManager.generateSessionId();
     this.retriever = new Retriever(config, this.sessionManager);
 
-    this.tools = {
-      executeCommand: this.executeCommand.bind(this),
-      createFile: this.createFile.bind(this),
-      writeFile: this.writeFile.bind(this),
-      readFile: this.readFile.bind(this),
-      listDirectory: this.listDirectory.bind(this),
-      searchFiles: this.searchFiles.bind(this),
-      getSystemInfo: this.getSystemInfo.bind(this),
-    };
+    this.tools = tools;
     this.maxIterations = 10; // Prevent infinite loops
     this.currentIteration = 0;
   }
@@ -60,7 +53,7 @@ export class Agent {
         }
       }
 
-      throw error;
+      return errorOutput;
     }
   }
 
@@ -81,7 +74,7 @@ export class Agent {
       iteration: this.currentIteration,
     };
 
-    this.outputResult(startOutput, options);
+    await this.outputResult(startOutput, options);
 
     while (!context.completed && this.currentIteration < this.maxIterations) {
       this.currentIteration++;
@@ -89,7 +82,7 @@ export class Agent {
       try {
         // THINK mode
         const thinkResult = await this.thinkPhase(context, options);
-        this.outputResult(thinkResult, options);
+        await this.outputResult(thinkResult, options);
 
         // Check if thinking concluded we're done
         if (thinkResult.conclusion === "COMPLETE") {
@@ -104,7 +97,7 @@ export class Agent {
             thinkResult.nextAction,
             options
           );
-          this.outputResult(actionResult, options);
+          await this.outputResult(actionResult, options);
 
           // OBSERVE mode
           const observeResult = await this.observePhase(
@@ -112,7 +105,7 @@ export class Agent {
             context,
             options
           );
-          this.outputResult(observeResult, options);
+          await this.outputResult(observeResult, options);
 
           // Update context with observations
           context.observations.push(observeResult.observation);
@@ -141,7 +134,7 @@ export class Agent {
           },
         };
 
-        this.outputResult(errorResult, options);
+        await this.outputResult(errorResult, options);
 
         if (!this.isRecoverableError(error)) {
           throw error;
@@ -169,7 +162,7 @@ export class Agent {
       ),
     };
 
-    this.outputResult(outputResult, options);
+    await this.outputResult(outputResult, options);
     return outputResult;
   }
 
@@ -224,8 +217,12 @@ export class Agent {
         throw new Error(`Unknown tool: ${tool}`);
       }
 
+      if (parameters && typeof parameters !== "object") {
+        throw new Error("Tool parameters must be provided as an object");
+      }
+
       const startTime = Date.now();
-      const result = await this.tools[tool](...Object.values(parameters));
+      const result = await this.tools[tool](parameters || {});
       const duration = Date.now() - startTime;
 
       return {
@@ -440,26 +437,20 @@ Available tools: ${Object.keys(this.tools).join(", ")}
     return recoverableErrors.some((err) => error.message.includes(err));
   }
 
-  outputResult(result, options = {}) {
+  async outputResult(result, options = {}) {
     if (options.json) {
       console.log(JSON.stringify(result, null, 2));
     } else {
       this.formatHumanOutput(result);
     }
 
-    // Persist to session context asynchronously
+    // Persist to session context synchronously to avoid race conditions
     if (this.sessionManager && this.sessionId) {
-      this.sessionManager
-        .appendEntry(this.sessionId, result)
-        .then(() =>
-          this.sessionManager.pruneIfNeeded(
-            this.sessionId,
-            this.config.contextWindowSize
-          )
-        )
-        .catch(() => {
-          /* silently ignore persistence errors */
-        });
+      try {
+        await this.sessionManager.appendEntry(this.sessionId, result);
+      } catch {
+        /* silently ignore persistence errors */
+      }
     }
   }
 
@@ -620,7 +611,10 @@ Available tools: ${Object.keys(this.tools).join(", ")}
         ]);
 
         if (makePermanent) {
-          await this.config.updateEnvModel(this.config.defaultModel);
+          await this.config.updateEnvProvider(
+            this.config.llmProvider,
+            this.config.defaultModel
+          );
         }
       }
     } catch (error) {
@@ -685,6 +679,10 @@ Available tools: ${Object.keys(this.tools).join(", ")}
   }
 
   getSystemPrompt() {
+    const toolList = Object.keys(this.tools)
+      .map((t) => `- ${t}`)
+      .join("\n");
+
     return `You are an advanced CLI agent with structured thinking capabilities. You operate in a loop with these modes:
 
 1. START: Receive user task
@@ -693,14 +691,7 @@ Available tools: ${Object.keys(this.tools).join(", ")}
 4. OBSERVE: Analyze results
 5. OUTPUT: Provide final result
 
-Available Tools:
-- executeCommand(command): Execute shell commands
-- createFile(filePath, content): Create a new file
-- writeFile(filePath, content): Write/overwrite file content
-- readFile(filePath): Read file content
-- listDirectory(dirPath): List directory contents
-- searchFiles(pattern, directory): Search for files matching pattern
-- getSystemInfo(): Get system information
+Available Tools:\n${toolList}
 
 CRITICAL: Always respond with valid JSON in the exact format requested. Think through the task 3-4 times before deciding on actions.
 
