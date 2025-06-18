@@ -92,4 +92,16 @@ program
     }
   });
 
+// Default action when no command is specified - start interactive mode
+program.action(async () => {
+  try {
+    console.log(chalk.blue("🤖 Starting Interactive CLI Agent..."));
+    const agent = new Agent(config);
+    await agent.startInteractive();
+  } catch (error) {
+    console.error(chalk.red("❌ Error:"), error.message);
+    process.exit(1);
+  }
+});
+
 program.parse();

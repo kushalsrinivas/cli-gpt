@@ -142,10 +142,23 @@ The enhanced CLI agent now operates with a structured 4-mode system that provide
 
 ## Usage Examples
 
-### Basic Usage (Human-Readable Output)
+### Interactive Mode (Recommended)
 
 ```bash
-# List files in current directory
+# Start interactive mode (default behavior)
+node src/cli.js
+
+# Then type your requests:
+# - "list the files in the current directory"
+# - "show me system information"
+# - "find all .js files in the src directory"
+# - Press Ctrl+C to exit
+```
+
+### Single Command Mode
+
+```bash
+# Run one task and exit
 node src/cli.js run "list the files in the current directory"
 
 # Get system information
@@ -330,4 +343,7 @@ node src/cli.js run "problematic task" --verbose --json
 - [ ] Advanced reasoning patterns
 - [ ] Integration with more AI providers
 - [ ] Web interface for agent management
-# cli-gpt
+
+---
+
+_The CLI Agent provides a powerful, interactive way to leverage AI for command-line tasks and file management. Start with the interactive mode for the best experience!_

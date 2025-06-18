@@ -485,27 +485,34 @@ Available tools: ${Object.keys(this.tools).join(", ")}
 
   async startInteractive() {
     console.log(
-      chalk.green('🚀 Interactive mode started. Type "exit" to quit.')
+      chalk.green("🚀 Interactive mode started. Press Ctrl+C to quit.")
     );
 
+    // Handle Ctrl+C gracefully
+    process.on("SIGINT", () => {
+      console.log(chalk.yellow("\n👋 Goodbye!"));
+      process.exit(0);
+    });
+
     while (true) {
-      const { task } = await inquirer.prompt([
-        {
-          type: "input",
-          name: "task",
-          message: chalk.blue("What would you like me to do?"),
-          validate: (input) => input.trim() !== "" || "Please enter a task",
-        },
-      ]);
-
-      if (task.toLowerCase() === "exit") {
-        console.log(chalk.yellow("👋 Goodbye!"));
-        break;
-      }
-
       try {
+        const { task } = await inquirer.prompt([
+          {
+            type: "input",
+            name: "task",
+            message: chalk.blue("What would you like me to do?"),
+            validate: (input) => input.trim() !== "" || "Please enter a task",
+          },
+        ]);
+
+        // Execute the task
         await this.execute(task, { verbose: false, json: false });
       } catch (error) {
+        // Handle inquirer cancellation (Ctrl+C during prompt)
+        if (error.name === "ExitPromptError" || error.isTtyError) {
+          console.log(chalk.yellow("\n👋 Goodbye!"));
+          process.exit(0);
+        }
         console.error(chalk.red("❌ Error:"), error.message);
       }
 
