@@ -25,6 +25,9 @@ program
   )
   .action(async (task, options) => {
     try {
+      // Check if initialization is needed
+      await config.checkAndInitialize();
+
       if (!options.json) {
         console.log(chalk.blue("🤖 Starting CLI Agent..."));
         console.log(chalk.gray(`Task: ${task}`));
@@ -70,6 +73,9 @@ program
   .description("Start interactive mode")
   .action(async () => {
     try {
+      // Check if initialization is needed
+      await config.checkAndInitialize();
+
       console.log(chalk.blue("🤖 Starting Interactive CLI Agent..."));
       const agent = new Agent(config);
       await agent.startInteractive();
@@ -95,6 +101,9 @@ program
 // Default action when no command is specified - start interactive mode
 program.action(async () => {
   try {
+    // Check if initialization is needed
+    await config.checkAndInitialize();
+
     console.log(chalk.blue("🤖 Starting Interactive CLI Agent..."));
     const agent = new Agent(config);
     await agent.startInteractive();

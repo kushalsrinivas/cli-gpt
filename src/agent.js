@@ -4,6 +4,7 @@ import fs from "fs-extra";
 import path from "path";
 import chalk from "chalk";
 import inquirer from "inquirer";
+import readline from "readline";
 import { OpenRouterClient } from "./openrouter.js";
 
 const execAsync = promisify(exec);
@@ -484,9 +485,15 @@ Available tools: ${Object.keys(this.tools).join(", ")}
   }
 
   async startInteractive() {
+    console.log(chalk.green("🚀 Interactive mode started."));
+    console.log(chalk.cyan("💡 Tips:"));
+    console.log(chalk.gray("  • Type your requests naturally"));
     console.log(
-      chalk.green("🚀 Interactive mode started. Press Ctrl+C to quit.")
+      chalk.gray("  • Type '/switch' or '/model' to change AI models")
     );
+    console.log(chalk.gray("  • Type '/help' for more commands"));
+    console.log(chalk.gray("  • Press Ctrl+C to quit"));
+    console.log(chalk.gray(`  • Current model: ${this.config.defaultModel}\n`));
 
     // Handle Ctrl+C gracefully
     process.on("SIGINT", () => {
@@ -501,11 +508,40 @@ Available tools: ${Object.keys(this.tools).join(", ")}
             type: "input",
             name: "task",
             message: chalk.blue("What would you like me to do?"),
-            validate: (input) => input.trim() !== "" || "Please enter a task",
+            validate: (input) => {
+              if (input.trim() === "") {
+                return "Please enter a task";
+              }
+              return true;
+            },
           },
         ]);
 
+        // Check for special commands
+        const trimmedTask = task.trim().toLowerCase();
+
+        if (trimmedTask === "/switch" || trimmedTask === "/model") {
+          await this.handleModelSwitch();
+          continue;
+        }
+
+        if (trimmedTask === "/help") {
+          this.showInteractiveHelp();
+          continue;
+        }
+
+        if (trimmedTask === "/status") {
+          this.showStatus();
+          continue;
+        }
+
+        if (trimmedTask === "/quit" || trimmedTask === "/exit") {
+          console.log(chalk.yellow("👋 Goodbye!"));
+          process.exit(0);
+        }
+
         // Execute the task
+        console.log(chalk.gray(`Using model: ${this.config.defaultModel}`));
         await this.execute(task, { verbose: false, json: false });
       } catch (error) {
         // Handle inquirer cancellation (Ctrl+C during prompt)
@@ -518,6 +554,60 @@ Available tools: ${Object.keys(this.tools).join(", ")}
 
       console.log(""); // Add spacing between tasks
     }
+  }
+
+  async handleModelSwitch() {
+    try {
+      const switched = await this.config.switchModel();
+      if (switched) {
+        // Update the OpenRouter client with the new model
+        this.openRouter.setModel(this.config.defaultModel);
+
+        // Ask if user wants to make this change permanent
+        const { makePermanent } = await inquirer.prompt([
+          {
+            type: "confirm",
+            name: "makePermanent",
+            message: "Make this model change permanent in .env file?",
+            default: false,
+          },
+        ]);
+
+        if (makePermanent) {
+          await this.config.updateEnvModel(this.config.defaultModel);
+        }
+      }
+    } catch (error) {
+      console.error(chalk.red("❌ Error switching model:"), error.message);
+    }
+  }
+
+  showInteractiveHelp() {
+    console.log(chalk.blue("\n📖 Interactive Mode Help"));
+    console.log(chalk.white("Available Commands:"));
+    console.log(chalk.gray("  /help     - Show this help message"));
+    console.log(chalk.gray("  /switch   - Switch AI model"));
+    console.log(chalk.gray("  /model    - Switch AI model (alias)"));
+    console.log(chalk.gray("  /status   - Show current configuration"));
+    console.log(chalk.gray("  /quit     - Exit the application"));
+    console.log(chalk.gray("  /exit     - Exit the application"));
+    console.log(chalk.gray("  Ctrl+C    - Exit"));
+    console.log(chalk.white("\nExample Tasks:"));
+    console.log(chalk.gray("  • 'list files in current directory'"));
+    console.log(chalk.gray("  • 'create a new file called hello.txt'"));
+    console.log(chalk.gray("  • 'show me system information'"));
+    console.log(chalk.gray("  • 'find all .js files in src folder'\n"));
+  }
+
+  showStatus() {
+    console.log(chalk.blue("\n📊 Current Status"));
+    console.log(chalk.white("Configuration:"));
+    console.log(chalk.gray(`  Model: ${this.config.defaultModel}`));
+    console.log(chalk.gray(`  Max Tokens: ${this.config.maxTokens}`));
+    console.log(chalk.gray(`  Temperature: ${this.config.temperature}`));
+    console.log(chalk.gray(`  Verbose: ${this.config.verbose}`));
+    console.log(chalk.gray(`  Working Directory: ${process.cwd()}`));
+    console.log(chalk.gray(`  Platform: ${process.platform}\n`));
   }
 
   getSystemPrompt() {
