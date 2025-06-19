@@ -206,7 +206,9 @@ export class Agent {
     try {
       const { tool, parameters } = actionSpec;
 
-      if (!this.tools[tool]) {
+      // Get the actual tool function
+      const toolFunction = this.getToolFunction(tool);
+      if (!toolFunction) {
         throw new Error(`Unknown tool: ${tool}`);
       }
 
@@ -215,7 +217,7 @@ export class Agent {
       }
 
       const startTime = Date.now();
-      const result = await this.tools[tool](parameters || {});
+      const result = await toolFunction(parameters || {});
       const duration = Date.now() - startTime;
 
       return {
@@ -271,6 +273,9 @@ export class Agent {
   }
 
   buildThinkingPrompt(context, ragSnippets = []) {
+    // Get available tool names - handle both direct exports and tools object
+    const availableTools = this.getAvailableToolNames();
+
     return `
 TASK: ${context.originalTask}
 
@@ -299,7 +304,7 @@ Please think through this task step by step. You must provide your response in t
 
 Think through this at least 3-4 times to make sure everything is clear.
 
-Available tools: ${Object.keys(this.tools).join(", ")}
+Available tools: ${availableTools.join(", ")}
 `;
   }
 
@@ -709,10 +714,48 @@ Available tools: ${Object.keys(this.tools).join(", ")}
     console.log(chalk.gray(`  Platform: ${process.platform}\n`));
   }
 
+  getAvailableToolNames() {
+    // Handle the case where tools are exported both as individual functions
+    // and as a tools object with metadata
+    const toolNames = [];
+
+    // Check if we have the tools object with metadata
+    if (this.tools.tools && typeof this.tools.tools === "object") {
+      toolNames.push(...Object.keys(this.tools.tools));
+    } else {
+      // Fallback: get all exported function names, excluding the 'tools' object itself
+      const allKeys = Object.keys(this.tools);
+      toolNames.push(
+        ...allKeys.filter(
+          (key) =>
+            key !== "tools" &&
+            key !== "default" &&
+            typeof this.tools[key] === "function"
+        )
+      );
+    }
+
+    return toolNames;
+  }
+
+  getToolFunction(toolName) {
+    // First check if we have the tools object with metadata
+    if (this.tools.tools && this.tools.tools[toolName]) {
+      return this.tools.tools[toolName].fn;
+    }
+
+    // Fallback: check if it's directly exported as a function
+    if (typeof this.tools[toolName] === "function") {
+      return this.tools[toolName];
+    }
+
+    return null;
+  }
+
   getSystemPrompt() {
-    const toolList = Object.keys(this.tools)
-      .map((t) => `- ${t}`)
-      .join("\n");
+    // Get available tool names and descriptions
+    const availableTools = this.getAvailableToolNames();
+    const toolList = availableTools.map((t) => `- ${t}`).join("\n");
 
     return `You are an advanced CLI agent with structured thinking capabilities. You operate in a loop with these modes:
 
@@ -723,6 +766,12 @@ Available tools: ${Object.keys(this.tools).join(", ")}
 5. OUTPUT: Provide final result
 
 Available Tools:\n${toolList}
+
+CRITICAL DECISION RULES:
+- Use "conclusion": "CONTINUE" when you need to execute a tool to complete the task
+- Use "conclusion": "COMPLETE" ONLY when the task is already fully completed without needing any tools
+- If you identify a tool that should be executed, always use "conclusion": "CONTINUE"
+- Planning to use a tool is NOT the same as completing the task - you must actually execute it
 
 CRITICAL: Always respond with valid JSON in the exact format requested. Think through the task 3-4 times before deciding on actions.
 

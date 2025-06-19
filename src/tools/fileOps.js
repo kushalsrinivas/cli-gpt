@@ -258,12 +258,18 @@ export async function getSystemInfo() {
  * Create a directory (and any parent directories if they do not exist).
  * @param {Object} params
  * @param {string} params.dirPath - Path of the directory to create.
+ * @param {string} params.path - Alternative parameter name for the directory path.
  * @param {boolean} [params.recursive=true] - Whether to create parent directories as needed.
  */
-export async function createDirectory({ dirPath, recursive = true }) {
+export async function createDirectory({
+  dirPath,
+  path: pathParam,
+  recursive = true,
+}) {
   try {
-    if (!dirPath) throw new Error("Directory path is required");
-    const resolvedPath = path.resolve(dirPath);
+    const targetPath = dirPath || pathParam;
+    if (!targetPath) throw new Error("Directory path is required");
+    const resolvedPath = path.resolve(targetPath);
     if (await fs.pathExists(resolvedPath)) {
       return {
         success: true,
@@ -286,7 +292,7 @@ export async function createDirectory({ dirPath, recursive = true }) {
       timestamp: new Date().toISOString(),
     };
   } catch (error) {
-    return { success: false, error: error.message, path: dirPath };
+    return { success: false, error: error.message, path: targetPath };
   }
 }
 

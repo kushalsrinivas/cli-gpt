@@ -1,6 +1,5 @@
 import { Agent } from "./agent.js";
 import { PlannerAgent } from "./plannerAgent.js";
-import { ExecutorAgent } from "./executorAgent.js";
 import chalk from "chalk";
 import inquirer from "inquirer";
 
@@ -11,7 +10,6 @@ export class CoordinatorAgent {
 
     // Create specialized agents
     this.plannerAgent = new PlannerAgent(config, sessionId);
-    this.executorAgent = new ExecutorAgent(config, sessionId);
     this.fallbackAgent = new Agent(config, sessionId); // For simple tasks
   }
 
@@ -155,11 +153,7 @@ export class CoordinatorAgent {
 
       try {
         // Execute the current step
-        const stepResult = await this.executorAgent.executeStep(
-          step,
-          plan,
-          options
-        );
+        const stepResult = await this.executeStep(step, options);
         results.push(stepResult);
 
         // Save updated plan after each step
@@ -478,5 +472,119 @@ export class CoordinatorAgent {
 
   async listPlans() {
     return await this.plannerAgent.listPlans();
+  }
+
+  /**
+   * Determines if a BasicAgent output indicates successful completion.
+   * @param {object} output - The BasicAgent execute() return object
+   */
+  isStepSuccess(output) {
+    return output && output.completed === true && !output.error;
+  }
+
+  /**
+   * Execute a single plan step using a fresh BasicAgent instance.
+   * Handles attempt counting, retry logic up to max_attempts and returns
+   * a stepResult object compatible with previous ExecutorAgent.executeStep.
+   * This method purposefully does NOT mutate the currentStepIndex – the caller
+   * (executePlan) should decide whether to advance to the next step based on
+   * the returned flags (success, retry, abort, skipped).
+   */
+  async executeStep(step, options = {}) {
+    // Increment attempt and mark step as executing
+    step.status = "EXECUTING";
+    step.attempts = (step.attempts || 0) + 1;
+    step.started_at = step.started_at || new Date().toISOString();
+
+    // Emit STARTING status
+    await this.outputResult(
+      {
+        mode: "EXECUTE_PLAN",
+        timestamp: new Date().toISOString(),
+        status: "STEP_STARTING",
+        step: {
+          id: step.id,
+          description: step.description,
+          attempt: step.attempts,
+          maxAttempts: step.max_attempts,
+        },
+      },
+      options
+    );
+
+    // Build task string for BasicAgent
+    const taskStr = `Execute plan step #${step.id}: ${
+      step.description
+    }\nParameters: ${JSON.stringify(step.parameters || {}, null, 2)}`;
+
+    // Execute using fresh BasicAgent
+    const basic = new Agent(this.config, this.sessionId);
+    const basicOutput = await basic.execute(taskStr, options);
+
+    // Analyze success
+    if (this.isStepSuccess(basicOutput)) {
+      step.status = "COMPLETED";
+      step.completed_at = new Date().toISOString();
+      step.result = basicOutput;
+
+      await this.outputResult(
+        {
+          mode: "EXECUTE_PLAN",
+          timestamp: new Date().toISOString(),
+          status: "STEP_COMPLETED",
+          step: { id: step.id, description: step.description },
+        },
+        options
+      );
+
+      return { success: true, step, result: basicOutput };
+    }
+
+    // Failure path
+    step.error = basicOutput.error || "Step did not complete successfully";
+
+    if (step.attempts < step.max_attempts) {
+      // Prepare for retry
+      await this.outputResult(
+        {
+          mode: "EXECUTE_PLAN",
+          timestamp: new Date().toISOString(),
+          status: "STEP_RETRYING",
+          step: {
+            id: step.id,
+            description: step.description,
+            attempt: step.attempts,
+            nextAttempt: step.attempts + 1,
+          },
+          error: step.error,
+        },
+        options
+      );
+
+      // Reset status to pending so executePlan will retry same step
+      step.status = "PENDING";
+      return { success: false, retry: true, step, error: step.error };
+    }
+
+    // Exceeded max attempts – mark as failed
+    step.status = "FAILED";
+    step.failed_at = new Date().toISOString();
+
+    await this.outputResult(
+      {
+        mode: "EXECUTE_PLAN",
+        timestamp: new Date().toISOString(),
+        status: "STEP_FAILED",
+        step: {
+          id: step.id,
+          description: step.description,
+          attempt: step.attempts,
+        },
+        error: step.error,
+      },
+      options
+    );
+
+    return { success: false, step, error: step.error };
   }
 }
