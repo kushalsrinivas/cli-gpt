@@ -11,6 +11,9 @@ yarn-error.log*
 .env.test.local
 .env.production.local
 
+# Plans
+.cliagent/plans/
+
 # Configuration
 config.json
 
