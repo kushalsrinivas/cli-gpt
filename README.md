@@ -1,8 +1,17 @@
-# Enhanced CLI Agent with 4-Mode System
+# Enhanced CLI Agent with Multi-Step Task Coordination
 
 ## Overview
 
-The enhanced CLI agent now operates with a structured 4-mode system that provides better error handling, structured JSON output, and a more systematic approach to task execution. It supports both OpenRouter and OpenAI as AI providers.
+The enhanced CLI agent now features intelligent multi-step task coordination with specialized agents for complex task execution. It automatically detects whether tasks require multiple sequential steps and creates detailed execution plans with error handling, retry logic, and user intervention capabilities. The system supports both OpenRouter and OpenAI as AI providers.
+
+## Key Features
+
+- **🧠 Intelligent Task Analysis**: Automatically detects multi-step vs single-step tasks
+- **📋 Dynamic Plan Generation**: Creates detailed execution plans with dependencies and error handling
+- **🔄 Resume & Retry**: Resume interrupted plans and retry failed steps
+- **👤 User Intervention**: Interactive prompts for handling failures and modifications
+- **📊 Progress Tracking**: Real-time step-by-step execution monitoring
+- **💾 Plan Persistence**: All plans saved to disk for recovery and analysis
 
 ## Installation
 
@@ -14,7 +23,82 @@ npm install
 cliagent config
 ```
 
-## 4-Mode System
+## Multi-Step Task Coordination
+
+### Architecture
+
+The system uses three specialized agents:
+
+1. **CoordinatorAgent**: Main orchestrator that routes tasks and manages execution
+2. **PlannerAgent**: Analyzes tasks and creates detailed execution plans
+3. **ExecutorAgent**: Executes individual steps with retry logic and error handling
+
+### Task Detection
+
+The system automatically analyzes incoming tasks to determine complexity:
+
+```bash
+# Single-step task (uses original agent)
+cliagent run "list files in current directory"
+
+# Multi-step task (creates execution plan)
+cliagent run "create a PDF report, compress it, then upload to S3 and email the link"
+```
+
+### Execution Modes
+
+#### ANALYZE Mode
+
+- Determines if task is multi-step or single-step
+- Provides reasoning and complexity assessment
+
+#### PLAN Mode
+
+- Creates detailed sequential execution plan
+- Defines success criteria and error handling for each step
+- Saves plan to disk for persistence
+
+#### EXECUTE_PLAN Mode
+
+- Executes steps sequentially
+- Handles retries and failures
+- Provides real-time progress updates
+
+#### EXECUTE_STEP Mode
+
+- Individual step execution with detailed logging
+- Success/failure determination based on criteria
+- Retry logic with user intervention options
+
+### Plan Management
+
+```bash
+# List all execution plans
+cliagent list-plans
+
+# Show details of a specific plan
+cliagent show-plan <plan-id>
+
+# Resume a previously interrupted plan
+cliagent resume-plan <plan-id>
+```
+
+### Example Multi-Step Flow
+
+```json
+{
+  "mode": "PLAN",
+  "status": "CREATED",
+  "plan": {
+    "id": "abc123...",
+    "steps": 4,
+    "strategy": "Sequential execution with dependency management",
+    "risks": "File upload may fail due to network issues"
+  }
+}
+```
+
+## 4-Mode System (Legacy Single-Step)
 
 ### 1. START Mode
 

@@ -3,6 +3,7 @@
 import { Command } from "commander";
 import chalk from "chalk";
 import { Agent } from "./agent.js";
+import { CoordinatorAgent } from "./coordinatorAgent.js";
 import { config } from "./config.js";
 import { SessionManager } from "./sessionManager.js";
 import fs from "fs-extra";
@@ -15,7 +16,7 @@ program
   .description(
     "CLI agentic tool for executing commands and managing files with AI"
   )
-  .version("1.2.0");
+  .version("2.0.0");
 
 program
   .command("run")
@@ -55,8 +56,8 @@ program
         }
       }
 
-      const agent = new Agent(config, sessionId);
-      const result = await agent.execute(task, options);
+      const coordinator = new CoordinatorAgent(config, sessionId);
+      const result = await coordinator.execute(task, options);
 
       if (
         result &&
@@ -203,6 +204,166 @@ program
     console.log(
       chalk.green(`📌 Session ${id} set as default. Use --session to override.`)
     );
+  });
+
+// ----- Plan Management Commands -----
+
+program
+  .command("list-plans")
+  .description("List all execution plans")
+  .action(async () => {
+    try {
+      await config.checkAndInitialize();
+      const coordinator = new CoordinatorAgent(config);
+      const plans = await coordinator.listPlans();
+
+      if (plans.length === 0) {
+        console.log(chalk.yellow("No execution plans found."));
+        return;
+      }
+
+      console.log(chalk.blue("📋 Execution Plans:"));
+      plans.forEach((plan) => {
+        const statusColor =
+          plan.status === "COMPLETED"
+            ? "green"
+            : plan.status === "FAILED"
+            ? "red"
+            : "yellow";
+        console.log(
+          `${chalk[statusColor](plan.status)} ${plan.id.slice(0, 8)}... - ${
+            plan.task
+          }`
+        );
+        console.log(
+          chalk.gray(`  Created: ${new Date(plan.created).toLocaleString()}`)
+        );
+        console.log(chalk.gray(`  Steps: ${plan.steps}`));
+      });
+    } catch (error) {
+      console.error(chalk.red("❌ Error:"), error.message);
+      process.exit(1);
+    }
+  });
+
+program
+  .command("resume-plan")
+  .description("Resume execution of a specific plan")
+  .argument("<id>", "Plan ID (full ID or first 8 characters)")
+  .option("-v, --verbose", "Enable verbose output")
+  .option("-j, --json", "Output structured JSON")
+  .action(async (planId, options) => {
+    try {
+      await config.checkAndInitialize();
+      const coordinator = new CoordinatorAgent(config);
+
+      // If partial ID provided, find the full ID
+      let fullPlanId = planId;
+      if (planId.length === 8) {
+        const plans = await coordinator.listPlans();
+        const matchingPlan = plans.find((p) => p.id.startsWith(planId));
+        if (!matchingPlan) {
+          console.error(
+            chalk.red("❌ No plan found with ID starting with:"),
+            planId
+          );
+          process.exit(1);
+        }
+        fullPlanId = matchingPlan.id;
+      }
+
+      if (!options.json) {
+        console.log(chalk.blue("🔄 Resuming plan execution..."));
+        console.log(chalk.gray(`Plan ID: ${fullPlanId}`));
+      }
+
+      const result = await coordinator.resumePlan(fullPlanId, options);
+
+      if (!options.json) {
+        console.log(chalk.green("✅ Plan execution completed!"));
+      }
+
+      return result;
+    } catch (error) {
+      if (options.json) {
+        console.log(
+          JSON.stringify(
+            {
+              mode: "FATAL_ERROR",
+              timestamp: new Date().toISOString(),
+              error: { message: error.message },
+            },
+            null,
+            2
+          )
+        );
+      } else {
+        console.error(chalk.red("❌ Error:"), error.message);
+        if (options.verbose) {
+          console.error(error.stack);
+        }
+      }
+      process.exit(1);
+    }
+  });
+
+program
+  .command("show-plan")
+  .description("Display details of a specific plan")
+  .argument("<id>", "Plan ID (full ID or first 8 characters)")
+  .action(async (planId) => {
+    try {
+      await config.checkAndInitialize();
+      const coordinator = new CoordinatorAgent(config);
+
+      // If partial ID provided, find the full ID
+      let fullPlanId = planId;
+      if (planId.length === 8) {
+        const plans = await coordinator.listPlans();
+        const matchingPlan = plans.find((p) => p.id.startsWith(planId));
+        if (!matchingPlan) {
+          console.error(
+            chalk.red("❌ No plan found with ID starting with:"),
+            planId
+          );
+          process.exit(1);
+        }
+        fullPlanId = matchingPlan.id;
+      }
+
+      const plan = await coordinator.plannerAgent.loadPlan(fullPlanId);
+
+      console.log(
+        chalk.blue(`📋 Plan Details: ${plan.plan_id.slice(0, 8)}...`)
+      );
+      console.log(chalk.white(`Task: ${plan.original_task}`));
+      console.log(
+        chalk.gray(`Created: ${new Date(plan.created_at).toLocaleString()}`)
+      );
+      console.log(chalk.gray(`Strategy: ${plan.overall_strategy}`));
+      console.log(chalk.gray(`Total Steps: ${plan.steps.length}`));
+
+      console.log(chalk.blue("\n📝 Steps:"));
+      plan.steps.forEach((step, index) => {
+        const statusIcon =
+          step.status === "COMPLETED"
+            ? "✅"
+            : step.status === "FAILED"
+            ? "❌"
+            : step.status === "SKIPPED"
+            ? "⏭️"
+            : "⏳";
+        console.log(`${statusIcon} ${index + 1}. ${step.description}`);
+        console.log(chalk.gray(`   Tool: ${step.tool}`));
+        console.log(chalk.gray(`   Status: ${step.status}`));
+        if (step.error) {
+          console.log(chalk.red(`   Error: ${step.error}`));
+        }
+      });
+    } catch (error) {
+      console.error(chalk.red("❌ Error:"), error.message);
+      process.exit(1);
+    }
   });
 
 program.parse();

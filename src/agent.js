@@ -513,6 +513,41 @@ Available tools: ${Object.keys(this.tools).join(", ")}
         console.log(chalk.red(`💥 [${timestamp}] ERROR`));
         console.log(chalk.red(result.error.message));
         break;
+
+      case "EXECUTE_STEP":
+        if (result.status === "STARTING") {
+          console.log(
+            chalk.cyan(`⚡ [${timestamp}] EXECUTING STEP ${result.step.id}`)
+          );
+          console.log(chalk.gray(`${result.step.description}`));
+          console.log(chalk.gray(`Tool: ${result.step.tool}`));
+          console.log(
+            chalk.gray(
+              `Attempt: ${result.step.attempt}/${result.step.maxAttempts}`
+            )
+          );
+        } else if (result.status === "COMPLETED") {
+          console.log(
+            chalk.green(`✅ [${timestamp}] STEP ${result.step.id} COMPLETED`)
+          );
+          console.log(chalk.gray(`${result.step.description}`));
+        } else if (result.status === "FAILED") {
+          console.log(
+            chalk.red(`❌ [${timestamp}] STEP ${result.step.id} FAILED`)
+          );
+          console.log(chalk.gray(`${result.step.description}`));
+          console.log(chalk.red(`Error: ${result.error}`));
+        } else if (result.status === "RETRYING") {
+          console.log(
+            chalk.yellow(`🔄 [${timestamp}] RETRYING STEP ${result.step.id}`)
+          );
+          console.log(
+            chalk.gray(
+              `Attempt ${result.nextAttempt}/${result.step.maxAttempts}`
+            )
+          );
+        }
+        break;
     }
   }
 
@@ -579,7 +614,10 @@ Available tools: ${Object.keys(this.tools).join(", ")}
 
         // Execute the task
         console.log(chalk.gray(`Using model: ${this.config.defaultModel}`));
-        await this.execute(task, { verbose: false, json: false });
+        // Dynamically import CoordinatorAgent to avoid circular dependency
+        const { CoordinatorAgent } = await import("./coordinatorAgent.js");
+        const coordinator = new CoordinatorAgent(this.config, this.sessionId);
+        await coordinator.execute(task, { verbose: false, json: false });
       } catch (error) {
         // Handle inquirer cancellation (Ctrl+C during prompt)
         if (error.name === "ExitPromptError" || error.isTtyError) {
